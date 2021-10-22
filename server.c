@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     char buffer[1024] = {0};
     struct sockaddr_in serv_addr_2;
     struct sockaddr_in client_addr;
-    //char *msg = "Working Fine";
+    char *synack = "SYN-ACK";
 
     if (argc != 2){
         perror("Not the correct number of args : Give the server port\n");
@@ -48,14 +48,43 @@ int main(int argc, char* argv[]) {
     while (1){
         if (recvfrom(serv_socket, buffer, sizeof(buffer), 0,
                      (struct sockaddr*)&client_addr, &tailleaddr) < 0){
-            printf("Couldn't receive\n");
+            printf("Couldn't receive SYN\n");
             return -1;
         }
 
         printf("Received message from IP: %s and port: %i\n",
                inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-        printf("Msg from client: %s\n", buffer);
+        printf("First Msg from client: %s\n", buffer);
+
+        if (strcmp(buffer,"SYN")==0){
+            printf("FLAG\n");
+            sendto(serv_socket, (const char *) synack, strlen(synack),
+                   MSG_CONFIRM, (const struct sockaddr *) &client_addr,
+                   sizeof(client_addr));
+
+            if (recvfrom(serv_socket, buffer, sizeof(buffer), 0,
+                         (struct sockaddr*)&client_addr, &tailleaddr) < 0){
+                printf("Couldn't receive ACK\n");
+                return -1;
+            }
+            if (strcmp(buffer,"ACK")==0){
+                if (recvfrom(serv_socket, buffer, sizeof(buffer), 0,
+                             (struct sockaddr*)&client_addr, &tailleaddr) < 0){
+                    printf("Couldn't receive first message\n");
+                    return -1;
+                }
+                printf("Msg from client: %s\n", buffer);
+            }else{
+                printf("Recieve not an ACK");
+            }
+
+
+        }else{
+            printf("Recieve not a SYN");
+        }
+
+
     }
 
     close(serv_socket);
