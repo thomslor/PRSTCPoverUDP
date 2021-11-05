@@ -6,8 +6,8 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-/*
-int connectionOverUDP(int client_socket, struct sockaddr_in* serv_addr, char* buffer, char* syn, char* ack, socklen_t tailleaddr){
+
+int connectionOverUDP(int client_socket, struct sockaddr_in* serv_addr, char* buffer, char* syn, char* ack, char* hello, socklen_t tailleaddr){
     sendto(client_socket, (const char *) syn, strlen(syn),
            MSG_CONFIRM, (const struct sockaddr *) serv_addr,
            sizeof(*serv_addr));
@@ -20,6 +20,7 @@ int connectionOverUDP(int client_socket, struct sockaddr_in* serv_addr, char* bu
     }
     //printf("Buffer avant comparaison SYNACK : %s", buffer);
     if(strcmp(buffer,"SYN-ACK")==0){
+        printf("Receive SYN-ACK\n");
         sendto(client_socket, (const char *) ack, strlen(ack),
                MSG_CONFIRM, (const struct sockaddr *) serv_addr,
                sizeof(*serv_addr));
@@ -33,7 +34,7 @@ int connectionOverUDP(int client_socket, struct sockaddr_in* serv_addr, char* bu
         return -1;
     }
 }
-*/
+
 int main(int argc, char* argv[]) {
     int client_socket;
     char buffer[1024] = {0};
@@ -62,28 +63,7 @@ int main(int argc, char* argv[]) {
 
     socklen_t tailleaddr = sizeof(serv_addr);
 
-    sendto(client_socket, (const char *) syn, strlen(syn),
-           MSG_CONFIRM, (const struct sockaddr *) &serv_addr,
-           sizeof(serv_addr));
-    printf("SYN message sent.\n");
-
-    if (recvfrom(client_socket, buffer, sizeof(buffer), 0,
-                 (struct sockaddr*)&serv_addr, &tailleaddr) < 0){
-        printf("Couldn't receive SYN-ACK\n");
-        return -1;
-    }
-    //printf("Buffer avant comparaison SYNACK : %s", buffer);
-    if(strcmp(buffer,"SYN-ACK")==0){
-        sendto(client_socket, (const char *) ack, strlen(ack),
-               MSG_CONFIRM, (const struct sockaddr *) &serv_addr,
-               sizeof(serv_addr));
-        printf("SYN-ACK recievd, ACK message sent\n");
-        sendto(client_socket, (const char *) hello, strlen(hello),
-               MSG_CONFIRM, (const struct sockaddr *) &serv_addr,
-               sizeof(serv_addr));
-    }else{
-        printf("Recieve not a SYN-ACK\n");
-    }
+    connectionOverUDP(client_socket, &serv_addr, buffer, syn, ack, hello, tailleaddr);
 
     close(client_socket);
 
