@@ -18,7 +18,8 @@ int connectionOverUDP(int client_socket, struct sockaddr_in* serv_addr, char* bu
         printf("Couldn't receive SYN-ACK\n");
         return -1;
     }
-    //printf("Buffer avant comparaison SYNACK : %s", buffer);
+    
+    // printf("Buffer avant comparaison SYNACK : %s", buffer);
     if(strcmp(buffer,"SYN-ACK")==0){
         printf("Receive SYN-ACK\n");
         sendto(client_socket, (const char *) ack, strlen(ack),
@@ -39,7 +40,7 @@ int main(int argc, char* argv[]) {
     int client_socket;
     char buffer[1024] = {0};
     struct sockaddr_in serv_addr;
-    char *hello = "uwu uwu uwu uwu uwu uwu uwu uwu";
+    char *hello = "uwu uwu";
     char *syn = "SYN";
     char *ack = "ACK";
 
