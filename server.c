@@ -9,7 +9,37 @@
 #include <sys/select.h>
 #include <sys/time.h>
 
-int SYNC(int serv_socket, struct sockaddr_in* client_addr, char* buffer, char*synack, socklen_t tailleaddr){
+
+int createSocket(int portv){
+    int server_socket_data;
+    server_socket_data = socket(AF_INET, SOCK_DGRAM, 0);
+    if (server_socket_data < 0){
+        printf("Couldn't create socket\n");
+        return -1;
+    }
+ 
+    struct sockaddr_in serv_addr_data;
+
+    // setsockopt(serv_socket_data, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));        memset((char*)&serv_addr_data,0,sizeof(serv_addr_data));
+    serv_addr_data.sin_family = AF_INET;
+    serv_addr_data.sin_port = htons(portv);
+    serv_addr_data.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(server_socket_data, (struct sockaddr *)&serv_addr_data, sizeof(serv_addr_data))<0){
+        perror("Bind UDP failed");
+        exit(EXIT_FAILURE);
+    }
+
+    return server_socket_data;
+    
+            
+}
+
+
+int SYNC(int serv_socket, struct sockaddr_in* client_addr, socklen_t tailleaddr, int portv){
+    char *buffer=malloc(sizeof(char)*1024);
+    char *synack = malloc(sizeof(char)*16);
+
     if (recvfrom(serv_socket, buffer, sizeof(buffer), 0,
                  (struct sockaddr*)client_addr, &tailleaddr) < 0){
         printf("Couldn't receive SYN\n");
@@ -20,14 +50,15 @@ int SYNC(int serv_socket, struct sockaddr_in* client_addr, char* buffer, char*sy
     int ntoh = ntohs(client_addr->sin_port);
     printf("SYN received from port %d\n", ntoh);
 
-    printf("First Msg from client: %s\n", buffer);
-
     if (strcmp(buffer,"SYN")==0){
-        
+        int sock_data = createSocket(portv);
+        printf("Sending SYNACK with port : %d\n", portv);
+        sprintf(synack,"SYNACK:%d",portv);
+        //printf("%s\n",synack);
         sendto(serv_socket, (const char *) synack, strlen(synack),
                MSG_CONFIRM, (const struct sockaddr *) client_addr,
                tailleaddr);
-        printf("Send SYNACK\n");
+        printf("SYNACK sent\n");
 
         if (recvfrom(serv_socket, buffer, sizeof(buffer), 0,
                      (struct sockaddr*)client_addr, &tailleaddr) < 0){
@@ -36,7 +67,7 @@ int SYNC(int serv_socket, struct sockaddr_in* client_addr, char* buffer, char*sy
         }
         if (strcmp(buffer,"ACK")==0){
             printf("ACK received from %s\n", ntoa);
-            return 0;
+            return sock_data;
         }else{
             printf("Recieve not an ACK");
         }
@@ -47,31 +78,14 @@ int SYNC(int serv_socket, struct sockaddr_in* client_addr, char* buffer, char*sy
     return -1;
 }
 
-int createSocket(){
-    int sock;
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0){
-        printf("Couldn't create socket\n");
-        return -1;
-    }
-    return sock;
-}
 
-int send_portV(int port, int serv_socket, struct sockaddr_in* client_addr, char* buffer, socklen_t tailleaddr){
-    
-    char portV[10];
-    sprintf(portV, "%d", port);
-    strcpy(buffer, portV);
-    sendto(serv_socket, (const char *) buffer, strlen(buffer),
-           MSG_CONFIRM, (const struct sockaddr *) client_addr,
-           tailleaddr);
-    printf("Send portV\n");
-    return 0;
-}
 
-int recvData(int serv_socket, struct sockaddr_in* client_addr, char* buffer, socklen_t tailleaddr){
-    if (recvfrom(serv_socket, buffer, sizeof(buffer), 0,
-                 (struct sockaddr*)client_addr, &tailleaddr) < 0){
+int recvData(int serv_socket, struct sockaddr_in* client_addr, socklen_t tailleaddr, int portV){
+    char buffer[1024];
+    printf("Waiting for data on Port %d\n", portV);
+    int rcv = recvfrom(serv_socket, buffer, sizeof(buffer), 0,
+                 (struct sockaddr*)client_addr, &tailleaddr);
+    if (rcv < 0){
         printf("Couldn't receive data\n");
         return -1;
     }
@@ -86,10 +100,8 @@ int recvData(int serv_socket, struct sockaddr_in* client_addr, char* buffer, soc
 int main(int argc, char* argv[]) {
     int serv_socket = socket(AF_INET, SOCK_DGRAM, 0);
     int reuse = 1;
-    char buffer[1024] = {0};
     struct sockaddr_in serv_addr_2;
     struct sockaddr_in client_addr;
-    char *synack = "SYN-ACK";
     int portV = 3003; 
 
     if (argc != 2){
@@ -121,32 +133,20 @@ int main(int argc, char* argv[]) {
 
     socklen_t tailleaddr = sizeof(client_addr);
     while (1){
-        if (SYNC(serv_socket, &client_addr, buffer, synack, tailleaddr)==0){
+        int serv_socket_data = SYNC(serv_socket, &client_addr, tailleaddr, portV);
+        if (serv_socket_data !=-1){
             printf("Connection established\n");
-            int serv_socket_data = createSocket();
-            struct sockaddr_in serv_addr_data;
-
-            send_portV(portV, serv_socket, &client_addr, buffer, tailleaddr);
-
-            // setsockopt(serv_socket_data, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-            memset((char*)&serv_addr_data,0,sizeof(serv_addr_data));
-            serv_addr_data.sin_family = AF_INET;
-            serv_addr_data.sin_port = htons(portV);
-            serv_addr_data.sin_addr.s_addr = INADDR_ANY;
-
-            if (bind(serv_socket_data, (struct sockaddr *)&serv_addr_data, sizeof(serv_addr_data))<0){
-                perror("Bind UDP failed");
-                exit(EXIT_FAILURE);
-            }
-            printf("Flag");
-            recvData(serv_socket, &client_addr, buffer, tailleaddr);
-            
-            portV++;
-
-            
         }
+        recvData(serv_socket_data, &client_addr, tailleaddr, portV);
+        portV++;
 
+        close(serv_socket_data);
+            
+            
+
+            
     }
+
     close(serv_socket);
 
 
